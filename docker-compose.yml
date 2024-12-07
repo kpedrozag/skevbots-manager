@@ -1,0 +1,13 @@
+services:
+  mongodb:
+    image: mongo:8
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=db_user
+      - MONGO_INITDB_ROOT_PASSWORD=db_p4ssw0rd
+    volumes:
+      - type: bind
+        source: ./db/data
+        target: /data/db
+      - ./db/image/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - 27017:27017
