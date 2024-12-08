@@ -11,10 +11,22 @@ type ErrorResponse = {
 type BotIdParam = { botId: string };
 
 const getTasks = async (
-  _: Request<{}, ITaskSchema[] | ErrorResponse>,
+  req: Request<
+    {},
+    ITaskSchema[] | ErrorResponse,
+    {},
+    { onlyAvailable: string }
+  >,
   res: Response<ITaskSchema[] | ErrorResponse>
 ) => {
   try {
+    const { onlyAvailable } = req.query;
+
+    if (onlyAvailable === "true") {
+      const response = await tasksService.getAvailableTasks();
+      return res.send(response);
+    }
+
     const response = await tasksService.getAllTasks();
     return res.send(response);
   } catch (err: any) {
@@ -26,10 +38,22 @@ const getTasks = async (
 };
 
 const getBots = async (
-  _: Request<{}, IBotSchema[] | ErrorResponse>,
+  req: Request<
+    {},
+    IBotSchema[] | ErrorResponse,
+    {},
+    { onlyWithTaskAssigned: string }
+  >,
   res: Response<IBotSchema[] | ErrorResponse>
 ) => {
   try {
+    const { onlyWithTaskAssigned } = req.query;
+
+    if (onlyWithTaskAssigned === "true") {
+      const response = await tasksService.getBotsWithTask();
+      return res.send(response);
+    }
+
     const response = await tasksService.getAllBots();
     return res.send(response);
   } catch (err: any) {
@@ -49,6 +73,10 @@ const createBot = async (
     const response = await tasksService.createBot(botId);
     return res.status(201).send(response);
   } catch (err: any) {
+    if (err?.errorResponse?.code === 11000) {
+      return res.status(409).send({ error: "Bot already exists" });
+    }
+
     const errMsg = "ERROR_CREATING_BOT";
     logger.error(err, errMsg);
 
@@ -57,7 +85,7 @@ const createBot = async (
 };
 
 const scheduleTasks = async (
-  req: Request<BotIdParam, {} | ErrorResponse, { tasks: string[] }>,
+  req: Request<BotIdParam, {} | ErrorResponse, { tasks: number[] }>,
   res: Response<{} | ErrorResponse>
 ) => {
   try {

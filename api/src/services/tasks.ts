@@ -2,21 +2,21 @@ import { Task, Bot } from "../db/models";
 import { InvalidRequest } from "../errors";
 
 const getAllTasks = async () => {
-  return await Task.find();
+  return await Task.find().lean();
 };
 
-const getAllBots = async () => {
-  return await Bot.find();
-};
+const getAvailableTasks = async () => Task.find({ expiresAt: null }).lean();
 
-const createBot = async (name: string) => {
-  return Bot.create({ name });
-};
+const getAllBots = async () => Bot.find().lean();
 
-const scheduleTasks = async (botName: string, tasks: string[]) => {
+const getBotsWithTask = async () => Bot.find({ tasks: { $ne: [] } }).lean();
+
+const createBot = async (name: string) => Bot.create({ name });
+
+const scheduleTasks = async (botName: string, tasks: number[]) => {
   const [tasksInfo, botInfo] = await Promise.all([
-    Task.find({ id: { $in: tasks }, expiresAt: null }),
-    Bot.findOne({ name: botName, tasks: { $size: 0 } }),
+    Task.find({ id: { $in: tasks }, expiresAt: null }).lean(),
+    Bot.findOne({ name: botName, tasks: { $size: 0 } }).lean(),
   ]);
 
   if (tasksInfo.length !== 2) {
@@ -51,4 +51,11 @@ const scheduleTasks = async (botName: string, tasks: string[]) => {
   await Bot.updateOne({ name: botName }, { tasks: botTasks });
 };
 
-export { getAllTasks, getAllBots, createBot, scheduleTasks };
+export {
+  getAllTasks,
+  getAllBots,
+  createBot,
+  scheduleTasks,
+  getAvailableTasks,
+  getBotsWithTask,
+};
