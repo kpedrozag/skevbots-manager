@@ -1,9 +1,12 @@
 import express from "express";
 import * as tasks from "./controllers/tasks";
 
+import cors = require("cors");
+
 const app = express();
 
 app.use(express.json());
+app.use(cors()); 
 
 const v1Router = express.Router();
 v1Router.get("/tasks", tasks.getTasks);
