@@ -8,8 +8,6 @@ type ErrorResponse = {
   error: string;
 };
 
-type BotIdParam = { botId: string };
-
 const getTasks = async (
   req: Request<
     {},
@@ -65,12 +63,12 @@ const getBots = async (
 };
 
 const createBot = async (
-  req: Request<BotIdParam, IBotSchema>,
+  req: Request<{ name: string }, IBotSchema>,
   res: Response<IBotSchema | ErrorResponse>
 ) => {
   try {
-    const { botId } = req.params;
-    const response = await tasksService.createBot(botId);
+    const { name } = req.params;
+    const response = await tasksService.createBot(name);
     return res.status(201).send(response);
   } catch (err: any) {
     if (err?.errorResponse?.code === 11000) {
@@ -80,12 +78,12 @@ const createBot = async (
     const errMsg = "ERROR_CREATING_BOT";
     logger.error(err, errMsg);
 
-    return res.status(500).send({ error: err.message || errMsg });
+    return res.status(500).send({ error: JSON.stringify(req.params) });
   }
 };
 
 const scheduleTasks = async (
-  req: Request<BotIdParam, {} | ErrorResponse, { tasks: number[] }>,
+  req: Request<{ botId: string }, {} | ErrorResponse, { tasks: string[] }>,
   res: Response<{} | ErrorResponse>
 ) => {
   try {
@@ -98,8 +96,8 @@ const scheduleTasks = async (
         .send({ error: "Invalid number of tasks: 2 tasks should be assigned" });
     }
 
-    await tasksService.scheduleTasks(botId, tasks);
-    return res.status(202).send();
+    const response = await tasksService.scheduleTasks(botId, tasks);
+    return res.status(202).send(response);
   } catch (err: any) {
     const errMsg = "ERROR_SCHEDULING_TASK";
     logger.error(err, errMsg);

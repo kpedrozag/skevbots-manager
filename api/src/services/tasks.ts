@@ -13,10 +13,10 @@ const getBotsWithTask = async () => Bot.find({ tasks: { $ne: [] } }).lean();
 
 const createBot = async (name: string) => Bot.create({ name });
 
-const scheduleTasks = async (botName: string, tasks: number[]) => {
+const scheduleTasks = async (botId: string, tasks: string[]) => {
   const [tasksInfo, botInfo] = await Promise.all([
-    Task.find({ id: { $in: tasks }, expiresAt: null }).lean(),
-    Bot.findOne({ name: botName, tasks: { $size: 0 } }).lean(),
+    Task.find({ _id: { $in: tasks }, expiresAt: null }).lean(),
+    Bot.findOne({ _id: botId, tasks: { $size: 0 } }).lean(),
   ]);
 
   if (tasksInfo.length !== 2) {
@@ -35,20 +35,25 @@ const scheduleTasks = async (botName: string, tasks: number[]) => {
     botTasks = [];
 
   for (const task of tasksInfo) {
-    const { id: taskId, duration, description } = task;
+    const { _id: taskId, duration, description } = task;
 
     taskToSchedule.push({
       updateOne: {
-        filter: { id: taskId },
+        filter: { _id: taskId },
         update: { $set: { expiresAt: now + duration } },
       },
     });
 
-    botTasks.push({ id: taskId, description, endsAt: now + duration });
+    botTasks.push({ _id: taskId, description, endsAt: now + duration });
   }
 
   await Task.bulkWrite(taskToSchedule);
-  await Bot.updateOne({ name: botName }, { tasks: botTasks });
+  await Bot.updateOne({ _id: botId }, { tasks: botTasks });
+
+  return {
+    botId,
+    tasks: botTasks,
+  };
 };
 
 export {

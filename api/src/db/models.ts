@@ -1,8 +1,8 @@
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 const { Schema, model } = mongoose;
 
 interface IBaseTaskSchema {
-  id: number;
+  _id: Types.ObjectId;
   description: string;
 }
 
@@ -12,6 +12,7 @@ export interface ITaskSchema extends IBaseTaskSchema {
 }
 
 export interface IBotSchema {
+  _id: Types.ObjectId;
   name: string;
   tasks: ITaskSchema[];
 }
@@ -21,7 +22,6 @@ interface IBotTasksSchemas extends IBaseTaskSchema {
 }
 
 const tasksSchema = new Schema<ITaskSchema>({
-  id: Number,
   description: String,
   duration: Number,
   expiresAt: {
@@ -36,7 +36,6 @@ const botSchema = new Schema<IBotSchema>({
   tasks: {
     type: [
       new Schema<IBotTasksSchemas>({
-        id: Number,
         description: String,
         endsAt: { type: Date, default: null },
       }),
