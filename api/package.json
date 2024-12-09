@@ -5,6 +5,7 @@
   "main": "dist/src/index.js",
   "scripts": {
     "dev": "dotenvx run -- npx ts-node src/index.ts",
+    "dev:watch": "dotenvx run -- tsnd src/index.ts",
     "build": "tswc -- src -d dist",
     "dev:js": "pnpm build && dotenvx run -- node dist/src/index.js",
     "debug": "echo 'Use VSCode Debugger'",
@@ -22,6 +23,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.1",
     "pino-pretty": "^13.0.0",
+    "ts-node-dev": "^2.0.0",
     "tswc": "^1.4.0",
     "typescript": "^5.7.2"
   },
