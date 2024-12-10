@@ -2,7 +2,7 @@ import pino, { type Logger } from "pino";
 
 const logger: Logger = pino({
   transport:
-    process.env.ENV !== "prod"
+    process.env.API_ENV !== "prod"
       ? {
           target: "pino-pretty",
           options: {
