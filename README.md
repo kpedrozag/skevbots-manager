@@ -22,6 +22,6 @@ Almost all the services are dockerized, BUT the web client (due to some sort of 
   VITE_API_URL=http://localhost:3000
   VITE_WS_URL=ws://localhost:3001
   ```
-- Run: `docker-compose up --build`.
+- Run: `docker-compose up --build`
 - In a separate tab console, run: `cd client && pnpm i && pn dev`
 - In the browser, opens: http://localhost:5173.
