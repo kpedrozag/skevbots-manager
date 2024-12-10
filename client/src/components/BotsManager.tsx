@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import useWebSocket from "react-use-websocket";
 
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
@@ -13,18 +14,32 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
-import { getTasks, getBots, createBot } from "@/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { getTasks, getBots, createBot, scheduleTasks } from "@/api";
 import type { Task, Bot } from "@/types";
 
 export default function SkevbotsManager() {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddBotDialogOpen, setIsAddBotDialogOpen] = useState(false);
+  const [isAssignTasksDialogOpen, setIsAssignTasksDialogOpen] = useState(false);
   const [newBotName, setNewBotName] = useState("");
   const [createBotError, setCreateBotError] = useState("");
+  const [selectedBot, setSelectedBot] = useState<Omit<Bot, "tasks">>();
+  const [firstTask, setFirstTask] = useState("");
+  const [secondTask, setSecondTask] = useState("");
+  const [shouldListen, setShouldListen] = useState(false);
   const queryClient = useQueryClient();
 
   const tasksQuery = useQuery<Task[]>({
@@ -49,12 +64,53 @@ export default function SkevbotsManager() {
       queryClient.invalidateQueries({ queryKey: ["busyBots"] });
       setNewBotName("");
       setCreateBotError("");
-      setIsDialogOpen(false);
+      setIsAddBotDialogOpen(false);
     },
     onError: (error) => {
       setCreateBotError(error.message);
     },
   });
+
+  const AssignTasksMutation = useMutation({
+    mutationFn: scheduleTasks,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bots"] });
+      queryClient.invalidateQueries({ queryKey: ["busyBots"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setSelectedBot({} as Bot);
+      setFirstTask("");
+      setSecondTask("");
+      setIsAssignTasksDialogOpen(false);
+      setShouldListen(true);
+    },
+  });
+
+  const { sendMessage, lastMessage } = useWebSocket<string>(
+    import.meta.env.VITE_WS_URL,
+    {
+      share: false,
+      shouldReconnect: () => true,
+    }
+  );
+
+  useEffect(() => {
+    if (shouldListen) {
+      sendMessage("START");
+    }
+  }, [shouldListen, sendMessage]);
+
+  useEffect(() => {
+    const { data } = (lastMessage as { data: string }) || {};
+    if (data === "UPDATE_TASKS") {
+      tasksQuery.refetch();
+    }
+  }, [lastMessage, tasksQuery]);
+
+  useEffect(() => {
+    if (shouldListen && tasksQuery.data?.every((t) => !t.expiresAt)) {
+      setShouldListen(false);
+    }
+  }, [shouldListen, tasksQuery]);
 
   const handleCreateBot = () => {
     if (newBotName.trim()) {
@@ -63,9 +119,27 @@ export default function SkevbotsManager() {
   };
 
   const handleClickAddBot = () => {
-    setIsDialogOpen(true);
+    setIsAddBotDialogOpen(true);
     setNewBotName("");
     setCreateBotError("");
+  };
+
+  const handleClickAssignTasks = (_id: string, name: string) => {
+    setSelectedBot({ _id, name });
+    setIsAssignTasksDialogOpen(true);
+    setFirstTask("");
+    setSecondTask("");
+  };
+
+  const handleClickSubmitAssignTasks = () => {
+    if (selectedBot?._id) {
+      AssignTasksMutation.mutate({
+        botId: selectedBot?._id,
+        tasks: [firstTask, secondTask],
+      });
+    } else {
+      throw new Error("Bot not selected");
+    }
   };
 
   return (
@@ -75,7 +149,7 @@ export default function SkevbotsManager() {
       <section className="space-y-4">
         <h2 className="text-2xl font-semibold flex items-center">
           <AssignmentIcon />
-          <span className="pl-2">Available tasks</span>
+          <span className="pl-2">Tasks list</span>
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {tasksQuery.isLoading ? (
@@ -85,14 +159,27 @@ export default function SkevbotsManager() {
           ) : (
             tasksQuery.data?.map((task) => (
               <div
-                key={task.id}
-                className="p-4 border rounded-lg text-center hover:bg-muted transition-colors"
+                key={`tli_${task._id}`}
+                className={
+                  "p-4 border rounded-lg text-center transition-colors"
+                }
               >
                 {task.description}
+                <br />
+                {task.expiresAt && (
+                  <span className="bg-yellow-200">
+                    {"("}Task in progress{")"}
+                  </span>
+                )}
               </div>
             ))
           )}
         </div>
+        {tasksQuery?.data?.length === 0 && (
+          <div className="bg-green-100 p-4 rounded-lg text-center">
+            Tasks completed!
+          </div>
+        )}
       </section>
 
       <div className="grid md:grid-cols-2 gap-8">
@@ -117,9 +204,17 @@ export default function SkevbotsManager() {
               </div>
             ) : (
               <ul className="space-y-2">
-                {botsQuery?.data?.map(({ name }) => (
-                  <li key={name} className="p-3 border rounded-lg">
+                {botsQuery?.data?.map(({ name, tasks, _id }) => (
+                  <li
+                    key={`bli_${_id}`}
+                    className="p-3 border rounded-lg flex justify-between items-baseline"
+                  >
                     {name}
+                    {tasks.length === 0 && (
+                      <Button onClick={() => handleClickAssignTasks(_id, name)}>
+                        Assign tasks
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -146,17 +241,29 @@ export default function SkevbotsManager() {
             ) : (
               <div className="space-y-4">
                 {busyBotsQuery?.data?.map((bot) => (
-                  <div key={bot.name} className="border rounded-lg p-4">
-                    <div className="text-lg font-medium mb-2">{bot.name}</div>
+                  <div
+                    key={`bbsi_${bot._id}`}
+                    className="border rounded-lg p-4"
+                  >
+                    <div className="text-lg font-medium mb-2 text-center">
+                      {bot.name}
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
-                      {bot.tasks.map((task) => (
-                        <div
-                          key={task.id}
-                          className="p-2 bg-muted rounded text-sm"
-                        >
-                          {task.description}
-                        </div>
-                      ))}
+                      {bot.tasks.map((task) => {
+                        const jsFormattedDate = new Date(
+                          task.endsAt
+                        ).toLocaleString();
+
+                        return (
+                          <div
+                            key={`tbsi_${task._id}`}
+                            className="p-2 bg-muted rounded text-sm"
+                          >
+                            <b>Task</b>: {task.description}. <br />
+                            <b>Ends at</b>: {jsFormattedDate}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -166,10 +273,13 @@ export default function SkevbotsManager() {
         </Card>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isAddBotDialogOpen} onOpenChange={setIsAddBotDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add a new bot</DialogTitle>
+            <DialogDescription>
+              Enter the name of new Bot and click {`"Save"`}
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Input
@@ -189,6 +299,78 @@ export default function SkevbotsManager() {
               disabled={createBotMutation.isPending || !newBotName.trim()}
             >
               {createBotMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isAssignTasksDialogOpen}
+        onOpenChange={setIsAssignTasksDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Assign tasks to the Bot: {selectedBot?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Select the tasks you want to assign and click {`"Assign"`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select
+              onValueChange={(value) => {
+                setFirstTask(value);
+                // setSecondTask("");
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Pick first task" />
+              </SelectTrigger>
+              <SelectContent>
+                {tasksQuery.data?.map((task, index) => (
+                  <SelectItem
+                    key={`o1_t${index}`}
+                    value={task._id}
+                    disabled={task._id === secondTask}
+                  >
+                    {task.description}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {firstTask && (
+              <div className="mt-5">
+                <Select
+                  onValueChange={(value) => {
+                    setSecondTask(value);
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Pick second task" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tasksQuery.data
+                      ?.filter((ts) => ts._id !== firstTask)
+                      .map((task, index) => (
+                        <SelectItem key={`o2_t${index}`} value={task._id}>
+                          {task.description}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={handleClickSubmitAssignTasks}
+              disabled={
+                AssignTasksMutation.isPending || !(firstTask && secondTask)
+              }
+            >
+              {AssignTasksMutation.isPending ? "Assigning..." : "Assign"}
             </Button>
           </DialogFooter>
         </DialogContent>

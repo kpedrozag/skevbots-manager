@@ -1,8 +1,8 @@
 import axios, { AxiosError } from "axios";
-import { Task, Bot } from "@/types";
+import { Task, Bot, AssignTasksInput } from "@/types";
 
 const api = axios.create({
-  baseURL: "http://localhost:3000/v1",
+  baseURL: `${import.meta.env.VITE_API_URL}/v1`,
   headers: {
     "Content-Type": "application/json",
   },
@@ -52,9 +52,12 @@ const createBot = async (name: string): Promise<Bot> => {
   }
 };
 
-const scheduleTasks = async (botId: string, tasks: string[]) => {
+const scheduleTasks = async ({
+  botId,
+  tasks,
+}: AssignTasksInput): Promise<Bot> => {
   try {
-    return api.post(`/bots/${botId}/task-schedule`, { tasks });
+    return await api.post(`/bots/${botId}/task-schedule`, { tasks });
   } catch {
     throw new Error("Failed to schedule tasks");
   }
