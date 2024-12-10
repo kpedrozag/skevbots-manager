@@ -7,11 +7,22 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=db_p4ssw0rd
     volumes:
       - type: bind
-        source: ./db/data
+        source: ./db/mongo/data
         target: /data/db
-      - ./db/image/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./db/mongo/image/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     ports:
       - 27017:27017
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - 6379:6379
+    volumes:
+      - ./db/redis/data:/root/redis
+      # - /path/to/local/redis.conf:/usr/local/etc/redis/redis.conf
+    environment:
+      - REDIS_PASSWORD=r3d1s_p4ssw0rd
+      - REDIS_PORT=6379
   api:
     build: ./api
     environment:

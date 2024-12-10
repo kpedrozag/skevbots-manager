@@ -129,5 +129,5 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-db/data/*
-!db/data/.gitkeep
+db/*/data/*
+!db/*/data/.gitkeep
