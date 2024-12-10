@@ -17,10 +17,22 @@ services:
     environment:
       - MONGO_URI=mongodb://db_user:db_p4ssw0rd@db:27017/application?authSource=admin
     env_file:
-      - ./api/.env
+      - ./.env
     ports:
       - 3000:3000
     depends_on:
       - db
     volumes:
       - ./api/src:/app/src
+  ws-api:
+    build: ./ws-api
+    env_file:
+      - ./.env
+    ports:
+      - 3001:3001
+    depends_on:
+      - api
+    environment:
+      - API_URL=http://api:3000
+    volumes:
+      - ./ws-api/src:/app/src
