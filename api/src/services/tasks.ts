@@ -1,5 +1,6 @@
-import { Task, Bot } from "../db/models";
+import { Task, Bot, ICompletedTasks } from "../db/models";
 import { InvalidRequest } from "../errors";
+import TasksDefaults from "../db/default-tasks.json";
 
 const getAllTasks = async () => {
   return await Task.find().lean();
@@ -56,6 +57,41 @@ const scheduleTasks = async (botId: string, tasks: string[]) => {
   };
 };
 
+const getCompletedTasks = async (): Promise<ICompletedTasks[]> => {
+  return Bot.aggregate([
+    {
+      $unwind: "$tasks",
+    },
+    {
+      $lookup: {
+        from: "tasks",
+        localField: "tasks._id",
+        foreignField: "_id",
+        as: "matchedTask",
+      },
+    },
+    {
+      $match: {
+        matchedTask: { $size: 0 },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        botId: "$_id",
+        taskId: "$tasks._id",
+        description: "$tasks.description",
+      },
+    },
+  ]);
+};
+
+const resetEntities = async () => {
+  await Promise.all([Bot.deleteMany({}), Task.deleteMany({})]);
+
+  return Task.insertMany(TasksDefaults);
+};
+
 export {
   getAllTasks,
   getAllBots,
@@ -63,4 +99,6 @@ export {
   scheduleTasks,
   getAvailableTasks,
   getBotsWithTask,
+  getCompletedTasks,
+  resetEntities,
 };

@@ -20,3 +20,9 @@ export interface AssignTasksInput {
   botId: string;
   tasks: string[];
 }
+
+export interface CompletedTasks {
+  botId: string;
+  taskId: string;
+  description: string;
+}

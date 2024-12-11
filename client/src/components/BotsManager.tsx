@@ -7,6 +7,7 @@ import useWebSocket from "react-use-websocket";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import AssignmentIndIcon from "@mui/icons-material/AssignmentInd";
 import ScheduleIcon from "@mui/icons-material/Schedule";
+import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -28,8 +29,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { getTasks, getBots, createBot, scheduleTasks } from "@/api";
-import type { Task, Bot } from "@/types";
+import {
+  getTasks,
+  getBots,
+  createBot,
+  scheduleTasks,
+  getCompletedTasks,
+  resetEntities,
+} from "@/api";
+import type { Task, Bot, CompletedTasks } from "@/types";
 
 export default function SkevbotsManager() {
   const [isAddBotDialogOpen, setIsAddBotDialogOpen] = useState(false);
@@ -40,11 +48,17 @@ export default function SkevbotsManager() {
   const [firstTask, setFirstTask] = useState("");
   const [secondTask, setSecondTask] = useState("");
   const [shouldListen, setShouldListen] = useState(false);
+  const [showSyncIcon, setShowSyncIcon] = useState(false);
   const queryClient = useQueryClient();
 
   const tasksQuery = useQuery<Task[]>({
     queryKey: ["tasks"],
     queryFn: () => getTasks(),
+  });
+
+  const completedTasksQuery = useQuery<CompletedTasks[]>({
+    queryKey: ["completed-tasks"],
+    queryFn: getCompletedTasks,
   });
 
   const botsQuery = useQuery<Bot[]>({
@@ -77,11 +91,28 @@ export default function SkevbotsManager() {
       queryClient.invalidateQueries({ queryKey: ["bots"] });
       queryClient.invalidateQueries({ queryKey: ["busyBots"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["completed-tasks"] });
       setSelectedBot({} as Bot);
       setFirstTask("");
       setSecondTask("");
       setIsAssignTasksDialogOpen(false);
       setShouldListen(true);
+      setShowSyncIcon(true);
+    },
+  });
+
+  const resetEntitiesMutation = useMutation({
+    mutationFn: resetEntities,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bots"] });
+      queryClient.invalidateQueries({ queryKey: ["busyBots"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["completed-tasks"] });
+      setSelectedBot({} as Bot);
+      setFirstTask("");
+      setSecondTask("");
+      setShouldListen(false);
+      setShowSyncIcon(false);
     },
   });
 
@@ -102,15 +133,25 @@ export default function SkevbotsManager() {
   useEffect(() => {
     const { data } = (lastMessage as { data: string }) || {};
     if (data === "UPDATE_TASKS") {
-      tasksQuery.refetch();
+      tasksQuery.refetch().then((tasks) => {
+        completedTasksQuery.refetch().then(() => {
+          if (
+            // shouldListen &&
+            tasks.data?.some((t) => !t.expiresAt || tasks.data.length === 0)
+          ) {
+            setShouldListen(false);
+            setShowSyncIcon(false);
+          }
+        });
+      });
     }
-  }, [lastMessage, tasksQuery]);
+  }, [lastMessage, tasksQuery, completedTasksQuery]);
 
-  useEffect(() => {
-    if (shouldListen && tasksQuery.data?.every((t) => !t.expiresAt)) {
-      setShouldListen(false);
-    }
-  }, [shouldListen, tasksQuery]);
+  // useEffect(() => {
+  //   if (shouldListen && tasksQuery.data?.every((t) => !t.expiresAt)) {
+  //     setShouldListen(false);
+  //   }
+  // }, [shouldListen, tasksQuery]);
 
   const handleCreateBot = () => {
     if (newBotName.trim()) {
@@ -146,6 +187,31 @@ export default function SkevbotsManager() {
     <div className="container mx-auto p-6 space-y-8">
       <h1 className="text-4xl font-bold text-center mb-12">Skevbots Manager</h1>
 
+      {showSyncIcon && (
+        <div className="flex flex-row-reverse items-center">
+          <div role="status">
+            <svg
+              aria-hidden="true"
+              className="w-8 h-8 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
+              viewBox="0 0 100 101"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
+                fill="currentColor"
+              />
+              <path
+                d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+                fill="currentFill"
+              />
+            </svg>
+            <span className="sr-only">Loading...</span>
+          </div>
+          <div className="p-5">Syncing...</div>
+        </div>
+      )}
+
       <section className="space-y-4">
         <h2 className="text-2xl font-semibold flex items-center">
           <AssignmentIcon />
@@ -177,7 +243,37 @@ export default function SkevbotsManager() {
         </div>
         {tasksQuery?.data?.length === 0 && (
           <div className="bg-green-100 p-4 rounded-lg text-center">
-            Tasks completed!
+            All tasks are completed! Well done.
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold flex items-center">
+          <AssignmentTurnedInIcon />
+          <span className="pl-2">Completed tasks</span>
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {completedTasksQuery.isLoading ? (
+            <div>Loading tasks...</div>
+          ) : completedTasksQuery.isError ? (
+            <div>Error loading completed tasks</div>
+          ) : (
+            completedTasksQuery.data?.map((task) => (
+              <div
+                key={`ctli_${task.taskId}`}
+                className={
+                  "p-4 border rounded-lg text-center transition-colors"
+                }
+              >
+                {task.description}
+              </div>
+            ))
+          )}
+        </div>
+        {completedTasksQuery?.data?.length === 0 && (
+          <div className="bg-yellow-100 p-4 rounded-lg text-center">
+            Tasks completed will show up here!
           </div>
         )}
       </section>
@@ -273,6 +369,18 @@ export default function SkevbotsManager() {
         </Card>
       </div>
 
+      {tasksQuery.data?.length === 0 &&
+        (completedTasksQuery?.data?.length || 0) >= 0 && (
+          <Button
+            variant={"destructive"}
+            onClick={() => {
+              resetEntitiesMutation.mutate();
+            }}
+          >
+            Reset
+          </Button>
+        )}
+
       <Dialog open={isAddBotDialogOpen} onOpenChange={setIsAddBotDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -285,6 +393,7 @@ export default function SkevbotsManager() {
             <Input
               placeholder="Enter bot name"
               value={newBotName}
+              maxLength={30}
               onChange={(e) => setNewBotName(e.target.value)}
             />
             {createBotError && (
@@ -318,49 +427,61 @@ export default function SkevbotsManager() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Select
-              onValueChange={(value) => {
-                setFirstTask(value);
-                // setSecondTask("");
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Pick first task" />
-              </SelectTrigger>
-              <SelectContent>
-                {tasksQuery.data?.map((task, index) => (
-                  <SelectItem
-                    key={`o1_t${index}`}
-                    value={task._id}
-                    disabled={task._id === secondTask}
-                  >
-                    {task.description}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {firstTask && (
-              <div className="mt-5">
+            {tasksQuery?.data?.filter((t) => !t.expiresAt)?.length === 0 ? (
+              <div className="bg-yellow-100 p-4 rounded-lg text-center">
+                No tasks to assign this time
+              </div>
+            ) : (
+              <>
                 <Select
                   onValueChange={(value) => {
-                    setSecondTask(value);
+                    setFirstTask(value);
+                    // setSecondTask("");
                   }}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Pick second task" />
+                    <SelectValue placeholder="Pick first task" />
                   </SelectTrigger>
                   <SelectContent>
                     {tasksQuery.data
-                      ?.filter((ts) => ts._id !== firstTask)
+                      ?.filter((t) => !t.expiresAt)
                       .map((task, index) => (
-                        <SelectItem key={`o2_t${index}`} value={task._id}>
+                        <SelectItem
+                          key={`o1_t${index}`}
+                          value={task._id}
+                          disabled={task._id === secondTask}
+                        >
                           {task.description}
                         </SelectItem>
                       ))}
                   </SelectContent>
                 </Select>
-              </div>
+
+                {firstTask && (
+                  <div className="mt-5">
+                    <Select
+                      onValueChange={(value) => {
+                        setSecondTask(value);
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Pick second task" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tasksQuery.data
+                          ?.filter(
+                            (ts) => ts._id !== firstTask && !ts.expiresAt
+                          )
+                          .map((task, index) => (
+                            <SelectItem key={`o2_t${index}`} value={task._id}>
+                              {task.description}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
             )}
           </div>
           <DialogFooter>

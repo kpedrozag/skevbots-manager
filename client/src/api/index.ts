@@ -1,5 +1,5 @@
 import axios, { AxiosError } from "axios";
-import { Task, Bot, AssignTasksInput } from "@/types";
+import { Task, Bot, AssignTasksInput, CompletedTasks } from "@/types";
 
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL}/v1`,
@@ -63,4 +63,28 @@ const scheduleTasks = async ({
   }
 };
 
-export { getTasks, getBots, createBot, scheduleTasks };
+const getCompletedTasks = async (): Promise<Array<CompletedTasks>> => {
+  try {
+    const response = await api.get("/tasks/completed");
+    return response.data;
+  } catch {
+    throw new Error("Failed to fetch completed tasks");
+  }
+};
+
+const resetEntities = async (): Promise<void> => {
+  try {
+    await api.delete("/");
+  } catch {
+    throw new Error("Failed to reset entities");
+  }
+};
+
+export {
+  getTasks,
+  getBots,
+  createBot,
+  scheduleTasks,
+  getCompletedTasks,
+  resetEntities,
+};

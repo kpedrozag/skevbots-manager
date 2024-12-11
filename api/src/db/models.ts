@@ -21,6 +21,12 @@ interface IBotTasksSchemas extends IBaseTaskSchema {
   endsAt: Date;
 }
 
+export interface ICompletedTasks {
+  botId: Types.ObjectId;
+  taskId: Types.ObjectId;
+  description: string;
+}
+
 const tasksSchema = new Schema<ITaskSchema>({
   description: String,
   duration: Number,

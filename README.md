@@ -9,7 +9,7 @@ Almost all the services are dockerized, BUT the web client (due to some sort of 
 
 ## Setup
 
-- Start docker deamon.
+- Start docker daemon.
 - Create `.env` file at the root of the project
   ```
   API_PORT=3000
@@ -23,5 +23,5 @@ Almost all the services are dockerized, BUT the web client (due to some sort of 
   VITE_WS_URL=ws://localhost:3001
   ```
 - Run: `docker-compose up --build`
-- In a separate tab console, run: `cd client && pnpm i && pn dev`
+- In a separate tab console, run: `cd client && pnpm i && pnpm dev`
 - In the browser, opens: http://localhost:5173.

@@ -106,4 +106,35 @@ const scheduleTasks = async (
   }
 };
 
-export { getTasks, getBots, createBot, scheduleTasks };
+const getCompletedTasks = async (req: Request, res: Response) => {
+  try {
+    const response = await tasksService.getCompletedTasks();
+    return res.send(response);
+  } catch (err: any) {
+    const errMsg = "ERROR_GETTING_COMPLETED_TASKS";
+    logger.error(err, errMsg);
+
+    return res.status(500).send({ error: err.message || errMsg });
+  }
+};
+
+const deleteAll = async (req: Request, res: Response) => {
+  try {
+    await tasksService.resetEntities();
+    return res.sendStatus(204);
+  } catch (err: any) {
+    const errMsg = "ERROR_DELETING_INFORMATION";
+    logger.error(err, errMsg);
+
+    return res.status(500).send({ error: err.message || errMsg });
+  }
+};
+
+export {
+  getTasks,
+  getBots,
+  createBot,
+  scheduleTasks,
+  getCompletedTasks,
+  deleteAll,
+};
